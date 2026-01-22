@@ -1,0 +1,1062 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Analisador de Movimento Esportivo</title>
+
+    <!-- MediaPipe -->
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/control_utils/control_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js" crossorigin="anonymous"></script>
+
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            min-height: 100vh;
+            color: #fff;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        header {
+            text-align: center;
+            padding: 15px 0;
+            margin-bottom: 20px;
+        }
+
+        header h1 {
+            font-size: 2rem;
+            background: linear-gradient(90deg, #00ff88, #00d4ff);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 5px;
+        }
+
+        header p {
+            color: #a0a0a0;
+            font-size: 0.9rem;
+        }
+
+        .main-content {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 20px;
+        }
+
+        @media (max-width: 1000px) {
+            .main-content {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .card {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 15px;
+            padding: 20px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .card h2 {
+            font-size: 1.1rem;
+            color: #00ff88;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .video-container {
+            position: relative;
+            width: 100%;
+            border-radius: 10px;
+            overflow: hidden;
+            background: #000;
+        }
+
+        #video {
+            width: 100%;
+            display: block;
+            transform: scaleX(-1);
+        }
+
+        #canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            transform: scaleX(-1);
+        }
+
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-weight: 600;
+        }
+
+        .btn-primary {
+            background: linear-gradient(90deg, #00ff88, #00d4ff);
+            color: #1a1a2e;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(0, 255, 136, 0.4);
+        }
+
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.1);
+            color: #fff;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        .btn-secondary.active {
+            background: linear-gradient(90deg, #00ff88, #00d4ff);
+            color: #1a1a2e;
+            border: none;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .stat-card {
+            background: rgba(0, 255, 136, 0.1);
+            border-radius: 10px;
+            padding: 15px;
+            text-align: center;
+            border: 1px solid rgba(0, 255, 136, 0.2);
+        }
+
+        .stat-value {
+            font-size: 2.5rem;
+            font-weight: bold;
+            color: #00ff88;
+            text-shadow: 0 0 20px rgba(0, 255, 136, 0.5);
+        }
+
+        .stat-label {
+            font-size: 0.8rem;
+            color: #a0a0a0;
+            margin-top: 5px;
+        }
+
+        .feedback-list {
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .feedback-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px;
+            margin-bottom: 8px;
+            border-radius: 8px;
+            font-size: 0.9rem;
+        }
+
+        .feedback-good {
+            background: rgba(0, 255, 136, 0.15);
+            border-left: 3px solid #00ff88;
+        }
+
+        .feedback-warning {
+            background: rgba(255, 193, 7, 0.15);
+            border-left: 3px solid #ffc107;
+        }
+
+        .feedback-bad {
+            background: rgba(255, 68, 68, 0.15);
+            border-left: 3px solid #ff4444;
+        }
+
+        .quality-bar {
+            height: 20px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            overflow: hidden;
+            margin: 15px 0;
+        }
+
+        .quality-fill {
+            height: 100%;
+            border-radius: 10px;
+            transition: width 0.3s ease, background 0.3s ease;
+        }
+
+        .angle-display {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        .angle-item {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 10px;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .angle-value {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #00d4ff;
+        }
+
+        .angle-label {
+            font-size: 0.75rem;
+            color: #a0a0a0;
+        }
+
+        .instructions {
+            background: rgba(0, 212, 255, 0.1);
+            border-radius: 10px;
+            padding: 15px;
+            margin-top: 15px;
+            border-left: 3px solid #00d4ff;
+        }
+
+        .instructions h3 {
+            color: #00d4ff;
+            font-size: 0.9rem;
+            margin-bottom: 10px;
+        }
+
+        .instructions ul {
+            list-style: none;
+            font-size: 0.85rem;
+            color: #a0a0a0;
+        }
+
+        .instructions li {
+            padding: 3px 0;
+        }
+
+        .instructions li::before {
+            content: "→ ";
+            color: #00d4ff;
+        }
+
+        .loading {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(26, 26, 46, 0.95);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+
+        .loading.hidden {
+            display: none;
+        }
+
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 4px solid rgba(0, 255, 136, 0.2);
+            border-top-color: #00ff88;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .loading p {
+            margin-top: 20px;
+            color: #a0a0a0;
+        }
+
+        .depth-indicator {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-top: 10px;
+            padding: 10px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 8px;
+        }
+
+        .depth-label {
+            font-size: 0.9rem;
+            color: #a0a0a0;
+        }
+
+        .depth-value {
+            font-weight: bold;
+            padding: 5px 15px;
+            border-radius: 15px;
+            font-size: 0.85rem;
+        }
+
+        .depth-standing { background: rgba(128, 128, 128, 0.3); color: #888; }
+        .depth-partial { background: rgba(255, 193, 7, 0.3); color: #ffc107; }
+        .depth-parallel { background: rgba(0, 212, 255, 0.3); color: #00d4ff; }
+        .depth-deep { background: rgba(0, 255, 136, 0.3); color: #00ff88; }
+
+        .ml-quality-box {
+            background: rgba(138, 43, 226, 0.15);
+            border: 2px solid rgba(138, 43, 226, 0.5);
+            border-radius: 12px;
+            padding: 15px;
+            margin: 15px 0;
+            text-align: center;
+            transition: all 0.3s ease;
+        }
+
+        .ml-quality-box.ml-good {
+            background: rgba(0, 255, 136, 0.15);
+            border-color: #00ff88;
+        }
+
+        .ml-quality-box.ml-medium {
+            background: rgba(255, 193, 7, 0.15);
+            border-color: #ffc107;
+        }
+
+        .ml-quality-box.ml-bad {
+            background: rgba(255, 68, 68, 0.15);
+            border-color: #ff4444;
+        }
+
+        .ml-header {
+            font-size: 0.75rem;
+            color: #a0a0a0;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .ml-label {
+            font-size: 1.8rem;
+            font-weight: bold;
+            color: #fff;
+            text-shadow: 0 0 10px rgba(138, 43, 226, 0.5);
+        }
+
+        .ml-good .ml-label { color: #00ff88; text-shadow: 0 0 10px rgba(0, 255, 136, 0.5); }
+        .ml-medium .ml-label { color: #ffc107; text-shadow: 0 0 10px rgba(255, 193, 7, 0.5); }
+        .ml-bad .ml-label { color: #ff4444; text-shadow: 0 0 10px rgba(255, 68, 68, 0.5); }
+
+        .ml-confidence-label {
+            font-size: 0.8rem;
+            color: #888;
+            margin-top: 5px;
+        }
+
+        .ml-confidence {
+            color: #00d4ff;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="loading" id="loading">
+        <div class="spinner"></div>
+        <p>Carregando MediaPipe...</p>
+    </div>
+
+    <div class="container">
+        <header>
+            <h1>🏋️ Analisador de Movimento Esportivo</h1>
+            <p>Análise biomecânica em tempo real com MediaPipe</p>
+        </header>
+
+        <div class="main-content">
+            <div class="card">
+                <h2>📹 Câmera</h2>
+                <div class="video-container">
+                    <video id="video" playsinline></video>
+                    <canvas id="canvas"></canvas>
+                </div>
+
+                <div class="controls">
+                    <button class="btn btn-primary" id="startBtn" onclick="toggleCamera()">
+                        Iniciar Câmera
+                    </button>
+                    <button class="btn btn-secondary active" id="squatBtn" onclick="setExercise('squat')">
+                        Agachamento
+                    </button>
+                    <button class="btn btn-secondary" id="pushupBtn" onclick="setExercise('pushup')">
+                        Flexão
+                    </button>
+                    <button class="btn btn-secondary" id="resetBtn" onclick="resetCounter()">
+                        Resetar
+                    </button>
+                </div>
+
+                <div class="instructions" id="instructions">
+                    <h3>Instruções - Agachamento</h3>
+                    <ul>
+                        <li>Fique de frente ou de lado para a câmera</li>
+                        <li>Mantenha distância suficiente para corpo inteiro aparecer</li>
+                        <li>Execute o movimento completo para contar repetições</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2>📊 Análise</h2>
+
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-value" id="repCount">0</div>
+                        <div class="stat-label">Repetições</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="qualityScore">--</div>
+                        <div class="stat-label">Qualidade %</div>
+                    </div>
+                </div>
+
+                <div class="ml-quality-box" id="mlQualityBox">
+                    <div class="ml-header">Classificação ML (TFLite)</div>
+                    <div class="ml-label">--</div>
+                    <div class="ml-confidence-label">Confiança: <span class="ml-confidence">--</span></div>
+                </div>
+
+                <div class="depth-indicator">
+                    <span class="depth-label">Profundidade:</span>
+                    <span class="depth-value depth-standing" id="depthValue">--</span>
+                </div>
+
+                <div class="quality-bar">
+                    <div class="quality-fill" id="qualityBar" style="width: 0%; background: #888;"></div>
+                </div>
+
+                <h3 style="font-size: 0.9rem; margin: 15px 0 10px; color: #00d4ff;">Ângulos Articulares</h3>
+                <div class="angle-display">
+                    <div class="angle-item">
+                        <div class="angle-value" id="leftKneeAngle">--°</div>
+                        <div class="angle-label">Joelho Esq.</div>
+                    </div>
+                    <div class="angle-item">
+                        <div class="angle-value" id="rightKneeAngle">--°</div>
+                        <div class="angle-label">Joelho Dir.</div>
+                    </div>
+                    <div class="angle-item">
+                        <div class="angle-value" id="leftHipAngle">--°</div>
+                        <div class="angle-label">Quadril Esq.</div>
+                    </div>
+                    <div class="angle-item">
+                        <div class="angle-value" id="rightHipAngle">--°</div>
+                        <div class="angle-label">Quadril Dir.</div>
+                    </div>
+                </div>
+
+                <h3 style="font-size: 0.9rem; margin: 20px 0 10px; color: #00ff88;">Feedback</h3>
+                <div class="feedback-list" id="feedbackList">
+                    <div class="feedback-item feedback-good">
+                        Inicie a câmera para começar a análise
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Landmarks do MediaPipe Pose
+        const POSE_LANDMARKS = {
+            NOSE: 0,
+            LEFT_SHOULDER: 11,
+            RIGHT_SHOULDER: 12,
+            LEFT_ELBOW: 13,
+            RIGHT_ELBOW: 14,
+            LEFT_WRIST: 15,
+            RIGHT_WRIST: 16,
+            LEFT_HIP: 23,
+            RIGHT_HIP: 24,
+            LEFT_KNEE: 25,
+            RIGHT_KNEE: 26,
+            LEFT_ANKLE: 27,
+            RIGHT_ANKLE: 28
+        };
+
+        // Estado da aplicação
+        let pose = null;
+        let camera = null;
+        let isRunning = false;
+        let exerciseType = 'squat';
+        let repCount = 0;
+        let lastKneeAngle = null;
+        let currentPhase = 'neutral';
+        let mlEnabled = true;
+        let lastMLCall = 0;
+        const ML_CALL_INTERVAL = 200; // ms entre chamadas ML
+
+        // Elementos DOM
+        const video = document.getElementById('video');
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const loadingEl = document.getElementById('loading');
+
+        // Calcular ângulo entre 3 pontos
+        function calculateAngle(a, b, c) {
+            const radians = Math.atan2(c.y - b.y, c.x - b.x) - Math.atan2(a.y - b.y, a.x - b.x);
+            let angle = Math.abs(radians * 180.0 / Math.PI);
+            if (angle > 180.0) angle = 360 - angle;
+            return angle;
+        }
+
+        // Inicializar MediaPipe Pose
+        async function initPose() {
+            pose = new Pose({
+                locateFile: (file) => {
+                    return `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`;
+                }
+            });
+
+            pose.setOptions({
+                modelComplexity: 1,
+                smoothLandmarks: true,
+                enableSegmentation: false,
+                minDetectionConfidence: 0.5,
+                minTrackingConfidence: 0.5
+            });
+
+            pose.onResults(onResults);
+
+            loadingEl.classList.add('hidden');
+            console.log('MediaPipe Pose carregado!');
+        }
+
+        // Processar resultados do MediaPipe
+        function onResults(results) {
+            // Limpar canvas
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Desenhar imagem
+            ctx.drawImage(results.image, 0, 0, canvas.width, canvas.height);
+
+            if (!results.poseLandmarks) {
+                updateFeedback([{ text: 'Nenhuma pessoa detectada', level: 'warning' }]);
+                return;
+            }
+
+            const landmarks = results.poseLandmarks;
+
+            // Desenhar conexões e landmarks
+            drawPose(landmarks);
+
+            // Analisar exercício
+            if (exerciseType === 'squat') {
+                analyzeSquat(landmarks);
+            } else if (exerciseType === 'pushup') {
+                analyzePushup(landmarks);
+            }
+        }
+
+        // Desenhar pose no canvas
+        function drawPose(landmarks) {
+            const connections = [
+                [11, 12], [11, 13], [13, 15], [12, 14], [14, 16],
+                [11, 23], [12, 24], [23, 24],
+                [23, 25], [25, 27], [24, 26], [26, 28]
+            ];
+
+            // Desenhar conexões
+            ctx.strokeStyle = '#00ff88';
+            ctx.lineWidth = 3;
+            connections.forEach(([i, j]) => {
+                const a = landmarks[i];
+                const b = landmarks[j];
+                if (a.visibility > 0.5 && b.visibility > 0.5) {
+                    ctx.beginPath();
+                    ctx.moveTo(a.x * canvas.width, a.y * canvas.height);
+                    ctx.lineTo(b.x * canvas.width, b.y * canvas.height);
+                    ctx.stroke();
+                }
+            });
+
+            // Desenhar landmarks
+            landmarks.forEach((lm, i) => {
+                if (lm.visibility > 0.5) {
+                    ctx.beginPath();
+                    ctx.arc(lm.x * canvas.width, lm.y * canvas.height, 5, 0, 2 * Math.PI);
+                    ctx.fillStyle = '#00d4ff';
+                    ctx.fill();
+                }
+            });
+        }
+
+        // Analisar agachamento
+        function analyzeSquat(landmarks) {
+            const leftHip = landmarks[POSE_LANDMARKS.LEFT_HIP];
+            const rightHip = landmarks[POSE_LANDMARKS.RIGHT_HIP];
+            const leftKnee = landmarks[POSE_LANDMARKS.LEFT_KNEE];
+            const rightKnee = landmarks[POSE_LANDMARKS.RIGHT_KNEE];
+            const leftAnkle = landmarks[POSE_LANDMARKS.LEFT_ANKLE];
+            const rightAnkle = landmarks[POSE_LANDMARKS.RIGHT_ANKLE];
+            const leftShoulder = landmarks[POSE_LANDMARKS.LEFT_SHOULDER];
+            const rightShoulder = landmarks[POSE_LANDMARKS.RIGHT_SHOULDER];
+
+            // Calcular ângulos dos joelhos
+            let leftKneeAngle = null;
+            let rightKneeAngle = null;
+            let leftHipAngle = null;
+            let rightHipAngle = null;
+
+            if (leftHip.visibility > 0.5 && leftKnee.visibility > 0.5 && leftAnkle.visibility > 0.5) {
+                leftKneeAngle = calculateAngle(leftHip, leftKnee, leftAnkle);
+                document.getElementById('leftKneeAngle').textContent = leftKneeAngle.toFixed(0) + '°';
+            }
+
+            if (rightHip.visibility > 0.5 && rightKnee.visibility > 0.5 && rightAnkle.visibility > 0.5) {
+                rightKneeAngle = calculateAngle(rightHip, rightKnee, rightAnkle);
+                document.getElementById('rightKneeAngle').textContent = rightKneeAngle.toFixed(0) + '°';
+            }
+
+            if (leftShoulder.visibility > 0.5 && leftHip.visibility > 0.5 && leftKnee.visibility > 0.5) {
+                leftHipAngle = calculateAngle(leftShoulder, leftHip, leftKnee);
+                document.getElementById('leftHipAngle').textContent = leftHipAngle.toFixed(0) + '°';
+            }
+
+            if (rightShoulder.visibility > 0.5 && rightHip.visibility > 0.5 && rightKnee.visibility > 0.5) {
+                rightHipAngle = calculateAngle(rightShoulder, rightHip, rightKnee);
+                document.getElementById('rightHipAngle').textContent = rightHipAngle.toFixed(0) + '°';
+            }
+
+            // Calcular ângulo médio dos joelhos
+            let kneeAngle = null;
+            if (leftKneeAngle && rightKneeAngle) {
+                kneeAngle = (leftKneeAngle + rightKneeAngle) / 2;
+            } else if (leftKneeAngle) {
+                kneeAngle = leftKneeAngle;
+            } else if (rightKneeAngle) {
+                kneeAngle = rightKneeAngle;
+            }
+
+            // Determinar profundidade
+            let depth = 'standing';
+            let depthClass = 'depth-standing';
+            if (kneeAngle) {
+                if (kneeAngle < 100) {
+                    depth = 'Profundo';
+                    depthClass = 'depth-deep';
+                } else if (kneeAngle < 130) {
+                    depth = 'Paralelo';
+                    depthClass = 'depth-parallel';
+                } else if (kneeAngle < 160) {
+                    depth = 'Parcial';
+                    depthClass = 'depth-partial';
+                } else {
+                    depth = 'Em pé';
+                    depthClass = 'depth-standing';
+                }
+            }
+
+            const depthEl = document.getElementById('depthValue');
+            depthEl.textContent = depth;
+            depthEl.className = 'depth-value ' + depthClass;
+
+            // Contar repetições
+            if (kneeAngle && lastKneeAngle) {
+                if (lastKneeAngle > 130 && kneeAngle < 100) {
+                    if (currentPhase !== 'down') {
+                        currentPhase = 'down';
+                    }
+                } else if (lastKneeAngle < 130 && kneeAngle > 160) {
+                    if (currentPhase === 'down') {
+                        repCount++;
+                        currentPhase = 'up';
+                        document.getElementById('repCount').textContent = repCount;
+                    }
+                }
+            }
+            lastKneeAngle = kneeAngle;
+
+            // Calcular qualidade e gerar feedback
+            let quality = 100;
+            let feedback = [];
+
+            // Verificar simetria dos joelhos
+            if (leftKneeAngle && rightKneeAngle) {
+                const diff = Math.abs(leftKneeAngle - rightKneeAngle);
+                if (diff > 15) {
+                    quality -= 20;
+                    feedback.push({ text: 'Equilibre o peso entre as pernas', level: 'warning' });
+                }
+            }
+
+            // Verificar profundidade
+            if (depth === 'Profundo') {
+                feedback.push({ text: 'Excelente profundidade! 👍', level: 'good' });
+            } else if (depth === 'Parcial' && kneeAngle < 160) {
+                feedback.push({ text: 'Tente agachar mais fundo', level: 'warning' });
+                quality -= 15;
+            }
+
+            // Verificar alinhamento do tronco (usando quadril)
+            if (leftHipAngle && rightHipAngle) {
+                const hipDiff = Math.abs(leftHipAngle - rightHipAngle);
+                if (hipDiff > 10) {
+                    feedback.push({ text: 'Mantenha o tronco mais alinhado', level: 'warning' });
+                    quality -= 10;
+                }
+            }
+
+            if (quality >= 85 && feedback.length === 0) {
+                feedback.push({ text: 'Ótima execução! Continue assim! ⭐', level: 'good' });
+            }
+
+            quality = Math.max(0, quality);
+            updateQuality(quality);
+            updateFeedback(feedback);
+
+            // Desenhar ângulos no canvas
+            if (leftKneeAngle) {
+                drawAngle(leftKnee, leftKneeAngle, '#ffff00');
+            }
+            if (rightKneeAngle) {
+                drawAngle(rightKnee, rightKneeAngle, '#00ffff');
+            }
+
+            // Chamar classificação ML (com throttle)
+            if (mlEnabled) {
+                const now = Date.now();
+                if (now - lastMLCall > ML_CALL_INTERVAL) {
+                    lastMLCall = now;
+                    classifyWithML(landmarks, {
+                        left_knee_angle: leftKneeAngle || 0,
+                        right_knee_angle: rightKneeAngle || 0,
+                        left_hip_angle: leftHipAngle || 0,
+                        right_hip_angle: rightHipAngle || 0,
+                        left_elbow_angle: 0,
+                        right_elbow_angle: 0,
+                        left_shoulder_angle: 0,
+                        right_shoulder_angle: 0
+                    });
+                }
+            }
+        }
+
+        // Analisar flexão
+        function analyzePushup(landmarks) {
+            const leftShoulder = landmarks[POSE_LANDMARKS.LEFT_SHOULDER];
+            const rightShoulder = landmarks[POSE_LANDMARKS.RIGHT_SHOULDER];
+            const leftElbow = landmarks[POSE_LANDMARKS.LEFT_ELBOW];
+            const rightElbow = landmarks[POSE_LANDMARKS.RIGHT_ELBOW];
+            const leftWrist = landmarks[POSE_LANDMARKS.LEFT_WRIST];
+            const rightWrist = landmarks[POSE_LANDMARKS.RIGHT_WRIST];
+
+            let leftElbowAngle = null;
+            let rightElbowAngle = null;
+
+            if (leftShoulder.visibility > 0.5 && leftElbow.visibility > 0.5 && leftWrist.visibility > 0.5) {
+                leftElbowAngle = calculateAngle(leftShoulder, leftElbow, leftWrist);
+                document.getElementById('leftKneeAngle').textContent = leftElbowAngle.toFixed(0) + '°';
+                document.querySelector('#leftKneeAngle').parentElement.querySelector('.angle-label').textContent = 'Cotovelo Esq.';
+            }
+
+            if (rightShoulder.visibility > 0.5 && rightElbow.visibility > 0.5 && rightWrist.visibility > 0.5) {
+                rightElbowAngle = calculateAngle(rightShoulder, rightElbow, rightWrist);
+                document.getElementById('rightKneeAngle').textContent = rightElbowAngle.toFixed(0) + '°';
+                document.querySelector('#rightKneeAngle').parentElement.querySelector('.angle-label').textContent = 'Cotovelo Dir.';
+            }
+
+            let elbowAngle = null;
+            if (leftElbowAngle && rightElbowAngle) {
+                elbowAngle = (leftElbowAngle + rightElbowAngle) / 2;
+            } else if (leftElbowAngle) {
+                elbowAngle = leftElbowAngle;
+            } else if (rightElbowAngle) {
+                elbowAngle = rightElbowAngle;
+            }
+
+            // Fase
+            let phase = 'up';
+            if (elbowAngle && elbowAngle < 100) {
+                phase = 'down';
+            }
+
+            const depthEl = document.getElementById('depthValue');
+            depthEl.textContent = phase === 'down' ? 'Descendo' : 'Subindo';
+            depthEl.className = 'depth-value ' + (phase === 'down' ? 'depth-deep' : 'depth-parallel');
+
+            let quality = 100;
+            let feedback = [];
+
+            if (leftElbowAngle && rightElbowAngle) {
+                const diff = Math.abs(leftElbowAngle - rightElbowAngle);
+                if (diff > 15) {
+                    quality -= 20;
+                    feedback.push({ text: 'Equilibre a força entre os braços', level: 'warning' });
+                }
+            }
+
+            if (phase === 'down' && elbowAngle && elbowAngle > 110) {
+                feedback.push({ text: 'Desça mais para amplitude completa', level: 'warning' });
+                quality -= 15;
+            }
+
+            if (quality >= 85) {
+                feedback.push({ text: 'Boa execução! 💪', level: 'good' });
+            }
+
+            quality = Math.max(0, quality);
+            updateQuality(quality);
+            updateFeedback(feedback);
+        }
+
+        // Desenhar ângulo no canvas
+        function drawAngle(point, angle, color) {
+            const x = point.x * canvas.width;
+            const y = point.y * canvas.height;
+
+            ctx.fillStyle = color;
+            ctx.font = 'bold 16px Arial';
+            ctx.fillText(angle.toFixed(0) + '°', x + 10, y - 10);
+        }
+
+        // Atualizar qualidade
+        function updateQuality(quality) {
+            document.getElementById('qualityScore').textContent = quality.toFixed(0);
+
+            const bar = document.getElementById('qualityBar');
+            bar.style.width = quality + '%';
+
+            if (quality >= 80) {
+                bar.style.background = 'linear-gradient(90deg, #00ff88, #00d4ff)';
+            } else if (quality >= 60) {
+                bar.style.background = '#ffc107';
+            } else {
+                bar.style.background = '#ff4444';
+            }
+        }
+
+        // Atualizar feedback
+        function updateFeedback(messages) {
+            const list = document.getElementById('feedbackList');
+            list.innerHTML = '';
+
+            if (messages.length === 0) {
+                messages = [{ text: 'Analisando movimento...', level: 'good' }];
+            }
+
+            messages.forEach(msg => {
+                const div = document.createElement('div');
+                div.className = 'feedback-item feedback-' + msg.level;
+                div.textContent = msg.text;
+                list.appendChild(div);
+            });
+        }
+
+        // Alternar câmera
+        async function toggleCamera() {
+            const btn = document.getElementById('startBtn');
+
+            if (!isRunning) {
+                try {
+                    const stream = await navigator.mediaDevices.getUserMedia({
+                        video: { width: 1280, height: 720, facingMode: 'user' }
+                    });
+
+                    video.srcObject = stream;
+                    await video.play();
+
+                    canvas.width = video.videoWidth;
+                    canvas.height = video.videoHeight;
+
+                    camera = new Camera(video, {
+                        onFrame: async () => {
+                            await pose.send({ image: video });
+                        },
+                        width: 1280,
+                        height: 720
+                    });
+
+                    await camera.start();
+
+                    isRunning = true;
+                    btn.textContent = 'Parar Câmera';
+                    btn.style.background = '#ff4444';
+
+                } catch (err) {
+                    console.error('Erro ao acessar câmera:', err);
+                    alert('Não foi possível acessar a câmera. Verifique as permissões.');
+                }
+            } else {
+                if (camera) {
+                    camera.stop();
+                }
+                if (video.srcObject) {
+                    video.srcObject.getTracks().forEach(track => track.stop());
+                }
+
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+                isRunning = false;
+                btn.textContent = 'Iniciar Câmera';
+                btn.style.background = 'linear-gradient(90deg, #00ff88, #00d4ff)';
+            }
+        }
+
+        // Definir exercício
+        function setExercise(type) {
+            exerciseType = type;
+
+            document.getElementById('squatBtn').classList.toggle('active', type === 'squat');
+            document.getElementById('pushupBtn').classList.toggle('active', type === 'pushup');
+
+            const instructions = document.getElementById('instructions');
+            if (type === 'squat') {
+                instructions.innerHTML = `
+                    <h3>Instruções - Agachamento</h3>
+                    <ul>
+                        <li>Fique de frente ou de lado para a câmera</li>
+                        <li>Mantenha distância suficiente para corpo inteiro aparecer</li>
+                        <li>Execute o movimento completo para contar repetições</li>
+                    </ul>
+                `;
+                document.querySelector('#leftKneeAngle').parentElement.querySelector('.angle-label').textContent = 'Joelho Esq.';
+                document.querySelector('#rightKneeAngle').parentElement.querySelector('.angle-label').textContent = 'Joelho Dir.';
+            } else {
+                instructions.innerHTML = `
+                    <h3>Instruções - Flexão</h3>
+                    <ul>
+                        <li>Posicione a câmera de lado para melhor visualização</li>
+                        <li>Mantenha o corpo reto durante o movimento</li>
+                        <li>Desça até os cotovelos formarem ~90°</li>
+                    </ul>
+                `;
+                document.querySelector('#leftKneeAngle').parentElement.querySelector('.angle-label').textContent = 'Cotovelo Esq.';
+                document.querySelector('#rightKneeAngle').parentElement.querySelector('.angle-label').textContent = 'Cotovelo Dir.';
+            }
+
+            resetCounter();
+        }
+
+        // Resetar contador
+        function resetCounter() {
+            repCount = 0;
+            lastKneeAngle = null;
+            currentPhase = 'neutral';
+            document.getElementById('repCount').textContent = '0';
+            document.getElementById('qualityScore').textContent = '--';
+            document.getElementById('depthValue').textContent = '--';
+        }
+
+        // Classificar com ML via API
+        async function classifyWithML(landmarks, angles) {
+            try {
+                // Preparar landmarks para API
+                const landmarkData = {};
+                const landmarkNames = ['nose', 'left_shoulder', 'right_shoulder', 'left_elbow', 'right_elbow',
+                    'left_wrist', 'right_wrist', 'left_hip', 'right_hip',
+                    'left_knee', 'right_knee', 'left_ankle', 'right_ankle'];
+                const landmarkIndices = [0, 11, 12, 13, 14, 15, 16, 23, 24, 25, 26, 27, 28];
+
+                landmarkNames.forEach((name, i) => {
+                    const idx = landmarkIndices[i];
+                    const lm = landmarks[idx];
+                    landmarkData[`${name}_x`] = lm.x;
+                    landmarkData[`${name}_y`] = lm.y;
+                    landmarkData[`${name}_z`] = lm.z || 0;
+                    landmarkData[`${name}_visibility`] = lm.visibility;
+                });
+
+                const response = await fetch('/api/classify', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ landmarks: landmarkData, angles: angles })
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    updateMLDisplay(result);
+                }
+            } catch (err) {
+                console.error('Erro na classificação ML:', err);
+            }
+        }
+
+        // Atualizar exibição da classificação ML
+        function updateMLDisplay(result) {
+            const mlBox = document.getElementById('mlQualityBox');
+            if (!mlBox) return;
+
+            const label = result.quality_label;
+            const confidence = (result.confidence * 100).toFixed(0);
+
+            mlBox.querySelector('.ml-label').textContent = label;
+            mlBox.querySelector('.ml-confidence').textContent = `${confidence}%`;
+
+            // Atualizar cor
+            mlBox.classList.remove('ml-good', 'ml-medium', 'ml-bad');
+            if (label === 'Bom') {
+                mlBox.classList.add('ml-good');
+            } else if (label === 'Médio') {
+                mlBox.classList.add('ml-medium');
+            } else {
+                mlBox.classList.add('ml-bad');
+            }
+        }
+
+        // Verificar status do ML
+        async function checkMLStatus() {
+            try {
+                const response = await fetch('/api/status');
+                const status = await response.json();
+                mlEnabled = status.ml_available;
+                console.log('ML Status:', status);
+
+                if (!mlEnabled) {
+                    const mlBox = document.getElementById('mlQualityBox');
+                    if (mlBox) {
+                        mlBox.querySelector('.ml-label').textContent = 'Indisponível';
+                        mlBox.querySelector('.ml-confidence').textContent = '--';
+                    }
+                }
+            } catch (err) {
+                console.error('Erro ao verificar status ML:', err);
+                mlEnabled = false;
+            }
+        }
+
+        // Inicializar
+        initPose();
+        checkMLStatus();
+    </script>
+</body>
+</html>

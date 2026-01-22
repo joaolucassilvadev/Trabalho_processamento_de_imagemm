@@ -1,0 +1,77 @@
+# =============================================================================
+# Configurações do Sistema de Análise de Movimento Esportivo
+# =============================================================================
+
+# Configurações de Câmera/Vídeo
+camera:
+  index: 0
+  width: 1280
+  height: 720
+  fps: 30
+
+# Configurações do MediaPipe Pose
+pose_detection:
+  static_image_mode: false
+  model_complexity: 1  # 0=Lite, 1=Full, 2=Heavy
+  smooth_landmarks: true
+  enable_segmentation: false
+  min_detection_confidence: 0.5
+  min_tracking_confidence: 0.5
+
+# Configurações de Análise Biomecânica
+biomechanics:
+  # Ângulos ideais para agachamento (em graus)
+  squat:
+    knee_angle_min: 70
+    knee_angle_max: 100
+    hip_angle_min: 70
+    hip_angle_max: 100
+    symmetry_threshold: 10  # Diferença máxima entre lados
+  
+  # Ângulos ideais para flexão
+  pushup:
+    elbow_angle_down: 90
+    elbow_angle_up: 170
+    body_alignment_threshold: 15  # Graus de desvio permitido
+  
+  # Parâmetros para corrida
+  running:
+    knee_lift_min: 45  # Ângulo mínimo de elevação do joelho
+    cadence_target: 180  # Passos por minuto ideal
+
+# Configurações de Feedback
+feedback:
+  enabled: true
+  visual: true
+  audio: false
+  language: "pt-BR"
+  
+  # Cores para feedback visual (BGR)
+  colors:
+    good: [0, 255, 0]      # Verde
+    warning: [0, 165, 255]  # Laranja
+    bad: [0, 0, 255]        # Vermelho
+
+# Configurações de Gravação
+recording:
+  enabled: false
+  output_dir: "data/recordings"
+  format: "mp4"
+  save_landmarks: true
+
+# Configurações de Modelo
+model:
+  checkpoint_dir: "models/saved"
+  use_tflite: true
+
+# Configurações de Visualização
+visualization:
+  show_landmarks: true
+  show_connections: true
+  show_angles: true
+  show_metrics: true
+  landmark_color: [0, 255, 0]
+  connection_color: [255, 255, 255]
+  text_color: [255, 255, 255]
+  font_scale: 0.6
+  line_thickness: 2
