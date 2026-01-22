@@ -428,15 +428,13 @@ class ExerciseAnalyzer:
         
         # Contar repetições
         if knee_angle and self._last_knee_angle:
-            # Detectar transição para agachamento profundo
-            if self._last_knee_angle > 130 and knee_angle < 100:
-                if self.current_phase != "down":
-                    self.current_phase = "down"
-            # Detectar retorno à posição em pé
-            elif self._last_knee_angle < 130 and knee_angle > 160:
-                if self.current_phase == "down":
-                    self.rep_count += 1
-                    self.current_phase = "up"
+            # Detectar transição para agachamento profundo (entrada na fase "down")
+            if knee_angle < 100 and self.current_phase != "down":
+                self.current_phase = "down"
+            # Detectar retorno à posição em pé (completar repetição)
+            elif knee_angle > 160 and self.current_phase == "down":
+                self.rep_count += 1
+                self.current_phase = "up"
         
         self._last_knee_angle = knee_angle
         
